@@ -2,13 +2,19 @@
  * @Author: M_King 
  * @Date: 2017-08-17 09:56:56 
  * @Last Modified by: M_King
- * @Last Modified time: 2017-09-01 16:39:06
+ * @Last Modified time: 2017-09-02 00:40:20
  */
 
+/**
+ * 扫雷
+ * 
+ * @param {any} options 参数
+ */
 function MineClearance(options) {
     options = options || {};
     //默认参数
     var defaults = {
+        'wrap': document.body,
         'width': 10,
         'height': 10,
         'mine_count': 10
@@ -18,112 +24,106 @@ function MineClearance(options) {
 
     console.log('this.settings', this.settings);
 
-    var mine_data = randomDoubleNumber2(this.settings.width, this.settings.height, this.settings.mine_count);
+    var mine_data = randomDoubleNumber(this.settings.width, this.settings.height, this.settings.mine_count);
 
-    console.log('mine_data', mine_data);
-
-    var maps = [];
+    var data = [];
     for (var i = 0; i < this.settings.height; i++) {
-        maps.push(new Array(this.settings.width).fill(' '));
+        data.push(new Array(this.settings.width).fill(' '));
     }
 
+    //写入地雷
     mine_data.forEach(function(element) {
-        maps[element[1]][element[0]] = '#';
+        data[element[1]][element[0]] = '#';
     });
 
-    maps.forEach(function(element) {
+    var map = [];
+    for (var y = 0; y < data.length; y++) {
+        var row = [];
+        for (var x = 0; x < data[y].length; x++) {
+            row.push(new Unit({ 'value': data[y][x], 'x': x, 'y': y }));
+        }
+        map.push(row);
+    }
+
+    this.data = data;
+    this.map = map;
+}
+//生成地图
+MineClearance.prototype.drawMap = function() {
+    var map = this.map;
+    for (var y = 0; y < map.length; y++) {
+        var row = document.createElement('div');
+        row.classList.add('row');
+        for (var x = 0; x < map[y].length; x++) {
+            row.appendChild(map[y][x].dom);
+        }
+        this.settings.wrap.appendChild(row);
+    }
+};
+//显示数据
+MineClearance.prototype.showData = function() {
+    this.data.forEach(function(element) {
         console.log(element);
     });
-}
-
-function randomDoubleNumber2(width, height, count) {
-    var result = [];
-    var number = [];
-    var total = width * height;
-
+};
+//生成不重复的随机二维数字
+function randomDoubleNumber(width, height, count) {
+    var result = [],
+        number = [],
+        total = width * height;
+    //生成数字
     for (var i = 0; i < total; i++) {
         number.push(i);
     }
-
     var index = number.length;
-
+    //开始换位法随机
     for (var i = 0; i < count; i++) {
         var random = parseInt(Math.random() * index);
         index--;
 
-        result.push(number[random]);
-
+        result.push(numberToVector(number[random]));
+        //交换值
         [number[index], number[random]] = [number[random], number[index]];
     }
-
-    console.log('result', result, count);
-
-
     // 数字转坐标
     function numberToVector(number) {
         return [number % width, parseInt(number / width)];
     }
-
-    return result;
-
-}
-
-
-function randomDoubleNumber(width, height, count) {
-    var result = [],
-        col = [],
-        row = [],
-        row_data = {};
-    for (var i = 0; i < width; i++) {
-        col.push(i);
-    }
-
-    for (var i = 0; i < height; i++) {
-        row.push(i);
-        row_data[i] = { 'array': col.concat([]), 'index': width };
-    }
-    var row_index = row.length;
-    for (var i = 0; i < count; i++) {
-        var y = row[parseInt(Math.random() * row_index)];
-
-        var array = row_data[y].array;
-
-        var random = parseInt(Math.random() * row_data[y].index);
-
-        var x = row_data[y].array[random];
-
-        row_data[y].index--;
-
-        var last = array[row_data[y].index];
-
-        array[array.index] = x;
-        array[random] = last;
-
-        if (row_data[y].index < 1) {
-            row_index--;
-            var last_row = row[row_index];
-            row[row_index] = row[y];
-            row[y] = last_row;
-        }
-
-        if (typeof x == 'undefined') {
-            debugger;
-        }
-
-        // console.log('x', x, 'y', y, 'random', random);
-
-        result.push([x, y]);
-    }
-
-    // console.log('row', row, row_index);
-
     return result;
 }
 
+/**
+ * 单元格对象
+ * 
+ * @param {any} data 单元格数据
+ */
 function Unit(data) {
     var unit = document.createElement('div');
     unit.classList.add('unit');
+    unit.setAttribute('data-x', data.x);
+    unit.setAttribute('data-y', data.y);
+    var type_data = { '#': '<i class="fa fa-bug" aria-hidden="true"></i>' };
+    unit.innerHTML = '<span>' + (type_data[data.value] || '') + '</span>';
+
+    var that = this;
+
+    //绑定事件
+    unit.addEventListener('click', unitClick);
+    //单元格点击方法
+    function unitClick() {
+        this.classList.add('show');
+        that.show();
+        unit.removeEventListener('click', unitClick);
+    }
+
+    this.value = data.value;
+    this.dom = unit;
 }
+
+Unit.prototype.show = function() {
+    console.log('unit show');
+}
+
 
 /**
  * 参数对比

@@ -1,0 +1,336 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="keywords" content="" />
+    <meta name="description" content="" />
+    <meta name="viewport" content="width=device-width,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+    <title>MineClearance</title>
+    <link rel="stylesheet" type="text/css" href="style/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css" href="style/base.css" />
+    <link rel="stylesheet" type="text/css" href="style/style.css" />
+    <!-- MineClearance version: 17.0622.1 by M_King -->
+</head>
+
+<body>
+    <div id="wrap" class="inner">
+        <div class="game_box">
+            <div id="game_info" class="game_info"></div>
+            <div id="game_map" class="game_map"></div>
+        </div>
+        <!--<script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.js"></script>-->
+        <script type="text/javascript" src="js/base.js"></script>
+        <script type="text/javascript" src="js/web.js"></script>
+
+        <script type="text/javascript">
+            window.onload = function() {
+                console.log('window ready');
+
+                // 1，游戏结束
+                // 2，
+
+                //测试代码的运行时间
+                getRunTime(function() {
+                    //创建游戏对象
+                    var game = new MineClearance(10, 10);
+                    //设置地雷数量
+                    game.setMines(10);
+                    game.showGameData();
+                    //绘制游戏地图
+                    game.drawMap(document.getElementById('game_map'));
+                    game.startGame(document.getElementById('game_info'));
+                });
+
+            }
+
+            //计算运行时间
+            function getRunTime(action) {
+                var start = Date.now();
+                action();
+                console.log('Running time is', Date.now() - start + 'ms');
+            }
+
+            //扫雷对象
+            function MineClearance(width, height) {
+                this.data = {};
+                this.data.width = width;
+                this.data.height = height;
+
+                var map = new Array(height);
+                //填充数据
+                for (var i = 0; i < map.length; i++) {
+                    map[i] = new Array(width).fill(' ');
+                }
+                this.map = map;
+            }
+            //设置地雷数量
+            MineClearance.prototype.setMines = function(count) {
+                this.data.mine = count;
+                this.data.flag = 0;
+                var number = 0; //统计循环次数
+                //开始循环
+                for (var i = 0; i < count; i++) {
+                    number++; //增加循环次数
+                    var x = parseInt(Math.random() * this.data.width);
+                    var y = parseInt(Math.random() * this.data.height);
+                    //如果坐标重复则重新随机
+                    if (this.map[y][x] == '#') {
+                        i--;
+                    } else {
+                        this.map[y][x] = '#';
+                    }
+                }
+                console.log('count', count);
+                console.log('number', number); //显示循环次数
+
+                //显示地雷旁边的数字
+                this.showUnitsNumber();
+            };
+            //显示表格
+            MineClearance.prototype.showGameData = function() {
+                console.group('showGameData');
+                this.map.forEach(function(element, index) {
+                    console.log(index, element);
+                });
+                console.groupEnd();
+            };
+            //显示地雷旁边的数字
+            MineClearance.prototype.showUnitsNumber = function() {
+                //遍历单元格
+                for (var y = 0; y < this.map.length; y++) {
+                    for (var x = 0; x < this.map[y].length; x++) {
+                        //如果为地雷就跳过
+                        if (this.map[y][x] == '#') {
+                            continue;
+                        }
+                        var current = new Vector(x, y);
+                        var number = 0;
+                        //遍历单元格周围
+                        this.around(function(dir) {
+                            dir = current.plus(dir);
+                            if (this.isInside(dir) && this.map[dir.y][dir.x] == '#') {
+                                number++;
+                            }
+                        }.bind(this));
+                        //判断数字是否为空
+                        if (number) {
+                            this.map[y][x] = number.toString();
+                        }
+                    }
+                }
+            };
+            //绘制地图
+            MineClearance.prototype.drawMap = function(box) {
+                console.log('box', box);
+                this.box = box;
+                //遍历数据
+                dataRepeat(this.map, function(element, x, y) {
+                    //创建单元格
+                    var dom = createUnit(element, x, y);
+                    box.appendChild(dom);
+                }, function() {
+                    var br = document.createElement('br');
+                    box.appendChild(br);
+                });
+
+                //存储当前环境
+                var that = this;
+                //单元格点击事件
+                function unitsClick() {
+                    getRunTime(function() {
+                        if (that.data.flag_status) {
+                            if (this.classList.contains('flag')) {
+                                this.classList.remove('flag');
+                                var flag = this.getElementsByClassName('flag_icon')[0];
+                                this.removeChild(flag);
+                                that.changeMineCount(1);
+                            } else {
+                                var flag = document.createElement('div');
+                                flag.classList.add('flag_icon');
+                                flag.innerHTML = '<i class="fa fa-flag" aria-hidden="true"></i>';
+                                this.appendChild(flag);
+                                this.classList.add('flag');
+                                that.changeMineCount(-1);
+                            }
+                        } else {
+                            if (this.classList.contains('show') || this.classList.contains('flag')) {
+                                return false;
+                            }
+                            this.classList.add('show');
+                            this.classList.remove('unit')
+                                //判断当前单元格是否有地雷
+                            if (this.querySelectorAll('.mine').length) {
+                                this.classList.add('boom');
+                                gameOver(that);
+                            } else if (!this.getElementsByTagName('span')[0].innerHTML.length) {
+                                var x = this.getAttribute('data-x');
+                                var y = this.getAttribute('data-y');
+                                skipSpace(x, y);
+                            }
+                        }
+
+                    }.bind(this));
+
+                }
+
+                //跳过空白格
+                function skipSpace(x, y) {
+                    //当前坐标
+                    var current = new Vector(x, y);
+                    //遍历周围单元格
+                    that.around(function(dir) {
+                        dir = current.plus(dir);
+                        //判断坐标是否存在并且不是地雷
+                        if (that.isInside(dir) && that.map[dir.y][dir.x] != '#') {
+                            //获取坐标对应的dom
+                            var item = that.box.querySelector('[data-x="' + dir.x + '"][data-y="' + dir.y + '"]');
+                            //判断是否已显示
+                            if (!item.classList.contains('show') && !item.classList.contains('flag')) {
+                                item.classList.add('show');
+                                item.classList.remove('unit');
+                                //判断是否为数据
+                                if (!item.querySelectorAll('.number').length) {
+                                    skipSpace(dir.x, dir.y);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                //获取单元格
+                var units = that.box.querySelectorAll('div.unit');
+                //批量绑定点击事件
+                Array.prototype.forEach.call(units, function(element) {
+                    element.addEventListener('click', unitsClick, false);
+                });
+
+                //游戏结束
+                function gameOver(that) {
+
+                    that.box.classList.add('over');
+                    Array.prototype.forEach.call(units, function(element) {
+                        //显示所有单元格
+                        // element.classList.add('show');
+                        if (element.classList.contains('flag')) {
+                            if (element.getElementsByClassName('mine').length) {
+                                element.classList.add('correct');
+                            } else {
+                                element.classList.add('error');
+                            }
+
+                        }
+                        //移除点击事件
+                        element.removeEventListener('click', unitsClick, false);
+                    });
+                    // alert('Game Over! T_T');
+                };
+
+            };
+            //开始游戏
+            MineClearance.prototype.startGame = function(wrap) {
+                this.data.time = 0;
+                var that = this;
+
+                //创建计时器盒子
+                var time_box = createBox('now_time', '游戏时间： <span>--</span> 秒', wrap);
+                //创建计时器
+                this.timer = setInterval(function() {
+                    that.data.time++;
+                    time_box.textContent = that.data.time;
+                }, 1000);
+
+                this.mine_box = createBox('mine_count', '剩余地雷： <span>--</span>', wrap);
+
+                //显示地雷数量
+                this.changeMineCount();
+
+                createBox('flag_box', '<label><input id="flag_select" type="checkbox"> 使用旗帜</label>', wrap);
+                this.flag_box = document.getElementById('flag_select');
+                this.data.flag_status = false;
+
+                this.flag_box.addEventListener('change', function() {
+                    that.data.flag_status = this.checked;
+                });
+
+                //创建盒子
+                function createBox(class_name, text, wrap) {
+                    var box = document.createElement('div');
+                    box.classList.add(class_name);
+                    box.innerHTML = text;
+                    wrap.appendChild(box);
+                    var obj = wrap.querySelector('.' + class_name + ' span') || wrap.querySelector('.' + class_name);
+                    return obj;
+                }
+            };
+            //修改地雷数量
+            MineClearance.prototype.changeMineCount = function(count) {
+                this.data.mine += count || 0;
+                this.mine_box.textContent = this.data.mine;
+            };
+            //遍历单元格周围
+            MineClearance.prototype.around = function(callback) {
+                //方向数据
+                var directions = {
+                    'l': new Vector(-1, 0),
+                    'lt': new Vector(-1, -1),
+                    't': new Vector(0, -1),
+                    'rt': new Vector(1, -1),
+                    'r': new Vector(1, 0),
+                    'rb': new Vector(1, 1),
+                    'b': new Vector(0, 1),
+                    'lb': new Vector(-1, 1)
+                };
+
+                //遍历所有方向
+                for (var i in directions) {
+                    callback(directions[i], i);
+                }
+            };
+            //判断坐标是否在表格内
+            MineClearance.prototype.isInside = function(vector) {
+                return vector.x >= 0 && vector.x < this.data.width && vector.y >= 0 && vector.y < this.data.height;
+            };
+
+            //单元格对象
+            function createUnit(value, x, y) {
+                var item = document.createElement('div');
+                var span = document.createElement('span');
+
+                //判断单元格类型
+                if (parseInt(value)) {
+                    span.classList.add('number', 's' + value);
+                    span.textContent = value;
+                } else if (value == '#') {
+                    span.classList.add('mine');
+                    span.innerHTML = '<i class="fa fa-bug" aria-hidden="true"></i>';
+                }
+                item.appendChild(span);
+                //写入坐标数据
+                item.classList.add('unit');
+                item.setAttribute('data-x', x);
+                item.setAttribute('data-y', y);
+                return item;
+            }
+            //遍历数据
+            function dataRepeat(data, colCallback, rowCallback) {
+                for (var y = 0; y < data.length; y++) {
+                    for (var x = 0; x < data[y].length; x++) {
+                        colCallback(data[y][x], x, y);
+                    }
+                    rowCallback(data[y], y);
+                }
+            }
+            //坐标对象
+            function Vector(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+            //坐标值添加
+            Vector.prototype.plus = function(other) {
+                return new Vector(parseInt(this.x) + other.x, parseInt(this.y) + other.y);
+            };
+        </script>
+</body>
+
+</html>
